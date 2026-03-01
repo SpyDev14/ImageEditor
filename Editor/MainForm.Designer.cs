@@ -31,27 +31,44 @@
 			Panel toolsPanel;
 			GroupBox colorGroupBox;
 			GroupBox penWidthGroupBox;
+			MenuStrip menuStrip;
+			ToolStripMenuItem fileToolStripMenuItem;
+			ToolStripMenuItem openToolStripMenuItem;
+			ToolStripMenuItem newToolStripMenuItem;
+			ToolStripMenuItem withParamsToolStripMenuItem;
+			ToolStripMenuItem saveToolStripMenuItem;
+			ToolStripMenuItem saveAsToolStripMenuItem;
+			ToolStripMenuItem editToolStripMenuItem;
+			ToolStripMenuItem effectsToolStripMenuItem;
+			ToolStripMenuItem turnToGrayEffectToolStripMenuItem;
+			ToolStripMenuItem viewToolStripMenuItem;
+			ToolStripMenuItem centerCameraToolStripMenuItem;
 			selectedColorPanel = new Panel();
 			penWidthTrackBar = new TrackBar();
 			workspacePanel = new Panel();
-			openedPicture = new PictureBox();
+			picture = new PictureBox();
+			toolsPanel = new Panel();
+			colorGroupBox = new GroupBox();
+			penWidthGroupBox = new GroupBox();
 			menuStrip = new MenuStrip();
 			fileToolStripMenuItem = new ToolStripMenuItem();
 			openToolStripMenuItem = new ToolStripMenuItem();
 			newToolStripMenuItem = new ToolStripMenuItem();
+			withParamsToolStripMenuItem = new ToolStripMenuItem();
 			saveToolStripMenuItem = new ToolStripMenuItem();
 			saveAsToolStripMenuItem = new ToolStripMenuItem();
 			editToolStripMenuItem = new ToolStripMenuItem();
-			toolsPanel = new Panel();
-			colorGroupBox = new GroupBox();
-			penWidthGroupBox = new GroupBox();
+			effectsToolStripMenuItem = new ToolStripMenuItem();
+			turnToGrayEffectToolStripMenuItem = new ToolStripMenuItem();
+			viewToolStripMenuItem = new ToolStripMenuItem();
+			centerCameraToolStripMenuItem = new ToolStripMenuItem();
 			toolsPanel.SuspendLayout();
 			colorGroupBox.SuspendLayout();
 			penWidthGroupBox.SuspendLayout();
 			((System.ComponentModel.ISupportInitialize)penWidthTrackBar).BeginInit();
-			workspacePanel.SuspendLayout();
-			((System.ComponentModel.ISupportInitialize)openedPicture).BeginInit();
 			menuStrip.SuspendLayout();
+			workspacePanel.SuspendLayout();
+			((System.ComponentModel.ISupportInitialize)picture).BeginInit();
 			SuspendLayout();
 			// 
 			// toolsPanel
@@ -114,35 +131,10 @@
 			penWidthTrackBar.Value = 1;
 			penWidthTrackBar.ValueChanged += penWidthTrackBar_ValueChanged;
 			// 
-			// workspacePanel
-			// 
-			workspacePanel.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
-			workspacePanel.BorderStyle = BorderStyle.FixedSingle;
-			workspacePanel.Controls.Add(openedPicture);
-			workspacePanel.Location = new Point(1, 24);
-			workspacePanel.Margin = new Padding(0);
-			workspacePanel.Name = "workspacePanel";
-			workspacePanel.Size = new Size(505, 316);
-			workspacePanel.TabIndex = 2;
-			workspacePanel.MouseDown += workspacePanel_MouseDown;
-			workspacePanel.MouseMove += workspacePanel_MouseMove;
-			workspacePanel.MouseUp += workspacePanel_MouseUp;
-			// 
-			// openedPicture
-			// 
-			openedPicture.Anchor = AnchorStyles.None;
-			openedPicture.Cursor = Cursors.Cross;
-			openedPicture.Enabled = false;
-			openedPicture.Location = new Point(125, 70);
-			openedPicture.Name = "openedPicture";
-			openedPicture.Size = new Size(247, 168);
-			openedPicture.TabIndex = 1;
-			openedPicture.TabStop = false;
-			// 
 			// menuStrip
 			// 
 			menuStrip.BackColor = SystemColors.ControlLightLight;
-			menuStrip.Items.AddRange(new ToolStripItem[] { fileToolStripMenuItem, editToolStripMenuItem });
+			menuStrip.Items.AddRange(new ToolStripItem[] { fileToolStripMenuItem, editToolStripMenuItem, viewToolStripMenuItem });
 			menuStrip.Location = new Point(0, 0);
 			menuStrip.Name = "menuStrip";
 			menuStrip.Size = new Size(636, 24);
@@ -165,10 +157,19 @@
 			// 
 			// newToolStripMenuItem
 			// 
+			newToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { withParamsToolStripMenuItem });
 			newToolStripMenuItem.Name = "newToolStripMenuItem";
 			newToolStripMenuItem.Size = new Size(114, 22);
 			newToolStripMenuItem.Text = "New";
 			newToolStripMenuItem.Click += newToolStripMenuItem_Click;
+			// 
+			// withParamsToolStripMenuItem
+			// 
+			withParamsToolStripMenuItem.Name = "withParamsToolStripMenuItem";
+			withParamsToolStripMenuItem.Size = new Size(141, 22);
+			withParamsToolStripMenuItem.Text = "With params";
+			withParamsToolStripMenuItem.Visible = false;
+			withParamsToolStripMenuItem.Click += withParamsToolStripMenuItem_Click;
 			// 
 			// saveToolStripMenuItem
 			// 
@@ -186,9 +187,63 @@
 			// 
 			// editToolStripMenuItem
 			// 
+			editToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { effectsToolStripMenuItem });
 			editToolStripMenuItem.Name = "editToolStripMenuItem";
 			editToolStripMenuItem.Size = new Size(39, 20);
 			editToolStripMenuItem.Text = "Edit";
+			// 
+			// effectsToolStripMenuItem
+			// 
+			effectsToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { turnToGrayEffectToolStripMenuItem });
+			effectsToolStripMenuItem.Name = "effectsToolStripMenuItem";
+			effectsToolStripMenuItem.Size = new Size(109, 22);
+			effectsToolStripMenuItem.Text = "Effects";
+			// 
+			// turnToGrayEffectToolStripMenuItem
+			// 
+			turnToGrayEffectToolStripMenuItem.Name = "turnToGrayEffectToolStripMenuItem";
+			turnToGrayEffectToolStripMenuItem.Size = new Size(138, 22);
+			turnToGrayEffectToolStripMenuItem.Text = "Turn to gray";
+			turnToGrayEffectToolStripMenuItem.Click += turnToGrayEffectToolStripMenuItem_Click;
+			// 
+			// viewToolStripMenuItem
+			// 
+			viewToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { centerCameraToolStripMenuItem });
+			viewToolStripMenuItem.Name = "viewToolStripMenuItem";
+			viewToolStripMenuItem.Size = new Size(44, 20);
+			viewToolStripMenuItem.Text = "View";
+			// 
+			// centerCameraToolStripMenuItem
+			// 
+			centerCameraToolStripMenuItem.Name = "centerCameraToolStripMenuItem";
+			centerCameraToolStripMenuItem.Size = new Size(151, 22);
+			centerCameraToolStripMenuItem.Text = "Center camera";
+			centerCameraToolStripMenuItem.Click += centerCameraToolStripMenuItem_Click;
+			// 
+			// workspacePanel
+			// 
+			workspacePanel.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+			workspacePanel.BackColor = SystemColors.Control;
+			workspacePanel.BorderStyle = BorderStyle.FixedSingle;
+			workspacePanel.Controls.Add(picture);
+			workspacePanel.Location = new Point(-1, 24);
+			workspacePanel.Margin = new Padding(0);
+			workspacePanel.Name = "workspacePanel";
+			workspacePanel.Size = new Size(507, 318);
+			workspacePanel.TabIndex = 2;
+			workspacePanel.MouseDown += workspacePanel_MouseDown;
+			workspacePanel.MouseMove += workspacePanel_MouseMove;
+			workspacePanel.MouseUp += workspacePanel_MouseUp;
+			// 
+			// picture
+			// 
+			picture.Anchor = AnchorStyles.None;
+			picture.Enabled = false;
+			picture.Location = new Point(126, 71);
+			picture.Name = "picture";
+			picture.Size = new Size(247, 168);
+			picture.TabIndex = 1;
+			picture.TabStop = false;
 			// 
 			// MainForm
 			// 
@@ -198,35 +253,31 @@
 			Controls.Add(toolsPanel);
 			Controls.Add(workspacePanel);
 			Controls.Add(menuStrip);
+			KeyPreview = true;
 			MainMenuStrip = menuStrip;
 			MinimumSize = new Size(224, 192);
 			Name = "MainForm";
 			RightToLeft = RightToLeft.No;
 			Text = "Image Editor";
+			ResizeBegin += MainForm_ResizeBegin;
+			KeyDown += MainForm_KeyDown;
 			toolsPanel.ResumeLayout(false);
 			colorGroupBox.ResumeLayout(false);
 			penWidthGroupBox.ResumeLayout(false);
 			penWidthGroupBox.PerformLayout();
 			((System.ComponentModel.ISupportInitialize)penWidthTrackBar).EndInit();
-			workspacePanel.ResumeLayout(false);
-			((System.ComponentModel.ISupportInitialize)openedPicture).EndInit();
 			menuStrip.ResumeLayout(false);
 			menuStrip.PerformLayout();
+			workspacePanel.ResumeLayout(false);
+			((System.ComponentModel.ISupportInitialize)picture).EndInit();
 			ResumeLayout(false);
 			PerformLayout();
 		}
 
 		#endregion
 
-		private MenuStrip menuStrip;
-		private ToolStripMenuItem fileToolStripMenuItem;
-		private ToolStripMenuItem openToolStripMenuItem;
-		private ToolStripMenuItem newToolStripMenuItem;
-		private ToolStripMenuItem saveToolStripMenuItem;
-		private ToolStripMenuItem saveAsToolStripMenuItem;
-		private PictureBox openedPicture;
+		private PictureBox picture;
 		private Panel workspacePanel;
-		private ToolStripMenuItem editToolStripMenuItem;
 		private TrackBar penWidthTrackBar;
 		private Panel selectedColorPanel;
 	}
