@@ -8,16 +8,18 @@ namespace Editor;
 public partial class MainForm : Form
 {
 	const int NEW_WORKSPACE_HORIZONTAL_PADDING = 24;
-	const int NEW_WORKSPACE_VERTICAL_PADDING = 16;
+	const int NEW_WORKSPACE_VERTICAL_PADDING   = 16;
 
-	static readonly ImmutableArray<(string Name, ImmutableArray<string> Extensions)> supportedFileTypes = [
-		("PNG",    ["png"]),
-		("JPEG",   ["jpg", "jpeg", "jpe", "jfif"]),
-		("Bitmap", ["bmp"]),
-		("GIF",    ["gif"]),
-		("Icon",   ["ico"]),
-		("TIFF",   ["tiff", "tif"])
+	static readonly ImmutableArray<(ImageFormat ImageFormat, string Name, ImmutableArray<string> Extensions)> SupportedFileFormats = [
+		(ImageFormat.Png,  "PNG",    ["png"]),
+		(ImageFormat.Jpeg, "JPEG",   ["jpg", "jpeg", "jpe", "jfif"]),
+		(ImageFormat.Bmp,  "Bitmap", ["bmp"]),
+		(ImageFormat.Gif,  "GIF",    ["gif"]),
+		(ImageFormat.Icon, "Icon",   ["ico"]),
+		(ImageFormat.Tiff, "TIFF",   ["tiff", "tif"])
 	];
+	static readonly ImageFormat DefaultFileFormat = ImageFormat.Png;
+	static readonly ImmutableDictionary<string, ImageFormat> ExtensionToFileFormat;
 
 
 	Bitmap _bm;
@@ -26,8 +28,6 @@ public partial class MainForm : Form
 	Point _currentMousePos;
 	Pen _pen;
 	bool _isDrawing = false;
-
-	bool _isMoving = false;
 
 	string? _openedFileName;
 
@@ -43,30 +43,32 @@ public partial class MainForm : Form
 	} = Color.Black;
 
 
-	static string OpenDialogFilter
+	static readonly string SaveDialogFilter;
+	static readonly string OpenDialogFilter;
+	static string _OpenDialogFilter
 	{
 		get
 		{
 			if (field == null)
 			{
-				var allExtensions = supportedFileTypes.SelectMany(x => x.Extensions).Select(x => $"*.{x}");
+				var allExtensions = SupportedFileFormats.SelectMany(x => x.Extensions).Select(x => $"*.{x}");
 
 				field = $"Image Files ({string.Join(", ", allExtensions)})|{string.Join(";", allExtensions)}";
 			}
 			return field;
 		}
 	}
-	static string SaveDialogFilter
+	static string _SaveDialogFilter
 	{
 		get
 		{
 			if (field == null)
 			{
-				var variants = new string[supportedFileTypes.Length - 1];
+				var variants = new string[SupportedFileFormats.Length];
 
-				for (int i = 0; i < supportedFileTypes.Length; i++)
+				for (int i = 0; i < SupportedFileFormats.Length; i++)
 				{
-					var fileType = supportedFileTypes[i];
+					var fileType = SupportedFileFormats[i];
 
 					var displayedPart = $"{fileType.Name} ({string.Join(", ", fileType.Extensions.Select(x => $"*.{x}"))})";
 					var filterPart = string.Join(";", fileType.Extensions.Select(x => $"*.{x}"));
@@ -78,6 +80,25 @@ public partial class MainForm : Form
 			}
 			return field;
 		}
+	}
+
+	static MainForm()
+	{
+		ExtensionToFileFormat = ImmutableDictionary.CreateRange(
+			StringComparer.OrdinalIgnoreCase,
+			SupportedFileFormats
+				.SelectMany(suppFormat => suppFormat.Extensions.Select(ext => (ext, suppFormat.ImageFormat)))
+				.Select(pair => new KeyValuePair<string, ImageFormat>(pair.ext, pair.ImageFormat))
+		);
+
+		SaveDialogFilter = string.Join('|', SupportedFileFormats.Select(f => {
+			var formattedExts = f.Extensions.Select(ext => $"*.{ext}").ToArray();
+			return $"{f.Name} ({string.Join(", ", formattedExts)})|{string.Join(";", formattedExts)}";
+		}));
+
+	
+		var allExtsFormatted = SupportedFileFormats.SelectMany(x => x.Extensions).Select(x => $"*.{x}");
+		OpenDialogFilter = $"Image Files ({string.Join(", ", allExtsFormatted)})|{string.Join(";", allExtsFormatted)}";
 	}
 
 	public MainForm()
@@ -107,9 +128,9 @@ public partial class MainForm : Form
 		openedPicture.Image = _bm;
 
 		openedPicture.Height = _bm.Height;
-		openedPicture.Width = _bm.Width;
+		openedPicture.Width  = _bm.Width;
 		openedPicture.Location = new Point(
-			(workspacePanel.Width - _bm.Width) / 2,
+			(workspacePanel.Width  - _bm.Width)  / 2,
 			(workspacePanel.Height - _bm.Height) / 2
 		);
 
@@ -119,20 +140,24 @@ public partial class MainForm : Form
 	void NewImage()
 	{
 		SetImage(new Bitmap(
-			workspacePanel.Width - NEW_WORKSPACE_HORIZONTAL_PADDING * 2,
-			workspacePanel.Height - NEW_WORKSPACE_VERTICAL_PADDING * 2
+			workspacePanel.Width  - NEW_WORKSPACE_HORIZONTAL_PADDING * 2,
+			workspacePanel.Height - NEW_WORKSPACE_VERTICAL_PADDING   * 2
 		));
 		_gfx.Clear(Color.White);
 	}
 
 	void SaveAs(string filename)
 	{
+		ImageFormat format = DefaultFileFormat;
+
+
+		_bm.Save(filename, format);
 		_openedFileName = filename;
 	}
 
 	void SaveAs()
 	{
-		SaveFileDialog dialog = new() { Filter = SaveDialogFilter };
+		SaveFileDialog dialog = new() { Filter = _SaveDialogFilter };
 		if (dialog.ShowDialog() != DialogResult.OK)
 			return;
 
@@ -154,7 +179,7 @@ public partial class MainForm : Form
 	// Open //
 	private void openToolStripMenuItem_Click(object sender, EventArgs e)
 	{
-		OpenFileDialog dialog = new() { Filter = OpenDialogFilter };
+		OpenFileDialog dialog = new() { Filter = _OpenDialogFilter };
 
 		if (dialog.ShowDialog() != DialogResult.OK)
 			return;
