@@ -98,7 +98,7 @@
 			// selectedColorPanel
 			// 
 			selectedColorPanel.BackColor = Color.Red;
-			selectedColorPanel.BorderStyle = BorderStyle.Fixed3D;
+			selectedColorPanel.BorderStyle = BorderStyle.FixedSingle;
 			selectedColorPanel.Cursor = Cursors.Hand;
 			selectedColorPanel.Dock = DockStyle.Fill;
 			selectedColorPanel.Location = new Point(5, 19);

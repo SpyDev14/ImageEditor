@@ -98,6 +98,8 @@ public partial class MainForm : Form
 		penWidthTrackBar.Minimum = MIN_PEN_WIDTH;
 		penWidthTrackBar.Maximum = MAX_PEN_WIDTH;
 
+		WorkspaceNegativeMargin = -Math.Min(workspacePanel.Location.X, 0);
+
 		NewImage();
 
 		Debug.Assert(_gfx != null);
@@ -132,8 +134,8 @@ public partial class MainForm : Form
 	void CenterImage()
 	{
 		picture.Location = new Point(
-			(workspacePanel.Width - _bm.Width) / 2,
-			(workspacePanel.Height - _bm.Height) / 2
+			((workspacePanel.Width - _bm.Width) / 2) + WorkspaceNegativeMargin,
+			((workspacePanel.Height - _bm.Height) / 2) + WorkspaceNegativeMargin
 		);
 	}
 
