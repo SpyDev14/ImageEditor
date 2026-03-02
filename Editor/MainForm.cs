@@ -157,6 +157,7 @@ public partial class MainForm : Form
 		picture.Size = _bm.Size;
 
 		// Хотел бы тут ещё zoom подбирать такой, чтобы картинка влезала
+		// Ещё бы зум переработать, чтобы 100% - это picture размера workspacePanel с учётом OPEN_IMG...PADDING
 
 		CenterImage(smoothly: false);
 	}
