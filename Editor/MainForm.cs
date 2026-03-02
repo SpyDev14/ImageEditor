@@ -37,11 +37,20 @@ public partial class MainForm : Form
 	Pen _pen;
 	Point _previousMousePos;
 	bool _isDrawning = false;
-	bool _beInPictureOnLastFrame = false;
+	bool _cursorBeOnPictureInLastFrame = false;
 
 	Point _dragStartMousePos;
 	Point _dragStartPictureLocation;
-	bool _isDragging = false;
+	bool IsDragging
+	{
+		get => field;
+		set
+		{
+			if (value)
+				StopCenterImageAnimation();
+			field = value;
+		}
+	} = false;
 
 	string? _openedFileName;
 
@@ -56,11 +65,24 @@ public partial class MainForm : Form
 		}
 	} = Color.Black;
 
+
 	const float ZOOM_MIN = 0.1f;
 	const float ZOOM_MAX = 10f;
 	const float ZOOM_FACTOR = 1.2f;
+	const float ZOOM_EPSILON = 0.001f;
 
 	float _zoom = 1f;
+
+	/// <summary>
+	/// Ms per second for 1 tick (1000 ms / Count in frame)
+	/// </summary>
+	const int ANIMATION_INTERVAL_MS = 1000 / 160;
+	const double ANIMATION_SLOWDOWN_FACTOR = 0.125;
+	const double ANIMATION_DISTANCE_EPSILON = 1.0;
+
+	readonly object _animLock = new object();
+	CancellationTokenSource _animCts = new();
+	Point? _animTarget;
 
 	static MainForm()
 	{
@@ -87,22 +109,14 @@ public partial class MainForm : Form
 
 		FormClosed += (s, e) =>
 		{
+			_animCts?.Cancel();
+			_animCts?.Dispose();
+
 			_bm?.Dispose();
 			_gfx?.Dispose();
 			_pen?.Dispose();
 		};
 		workspacePanel.MouseWheel += workspacePanel_MouseWheel;
-
-		WorkspaceNegativeMargin = -Math.Min(workspacePanel.Location.X, 0);
-
-
-		_pen = new Pen(SelectedColor)
-		{
-			StartCap = LineCap.Round,
-			EndCap = LineCap.Round,
-			LineJoin = LineJoin.Round,
-		};
-
 		selectedColorPanel.BackColor = SelectedColor;
 
 		penWidthTrackBar.Minimum = MIN_PEN_WIDTH;
@@ -110,6 +124,16 @@ public partial class MainForm : Form
 
 		picture.SizeMode = PictureBoxSizeMode.StretchImage;
 
+
+		WorkspaceNegativeMargin = -Math.Min(workspacePanel.Location.X, 0);
+		_pen = new Pen(SelectedColor)
+		{
+			StartCap = LineCap.Round,
+			EndCap = LineCap.Round,
+			LineJoin = LineJoin.Round,
+		};
+
+		Task.Run(CenterImageAnimationLoop);
 
 		NewImage();
 
@@ -130,7 +154,7 @@ public partial class MainForm : Form
 		_zoom = 1.0f;
 		picture.Size = _bm.Size;
 
-		CenterImage();
+		CenterImage(smoothly: false);
 	}
 
 	void NewImage()
@@ -143,15 +167,23 @@ public partial class MainForm : Form
 		_openedFileName = null;
 	}
 
-	void CenterImage()
+	void CenterImage(bool smoothly = true)
 	{
-		picture.Location = new Point(
-			((workspacePanel.Width - _bm.Width) / 2) + WorkspaceNegativeMargin,
-			((workspacePanel.Height - _bm.Height) / 2) + WorkspaceNegativeMargin
+		var target = new Point(
+			((workspacePanel.Width - picture.Width) / 2) + WorkspaceNegativeMargin,
+			((workspacePanel.Height - picture.Height) / 2) + WorkspaceNegativeMargin
 		);
+
+		if (smoothly)
+			lock (_animLock) _animTarget = target;
+		else
+		{
+			StopCenterImageAnimation();
+			picture.Location = target;
+		}
 	}
 
-	void SaveAs(string filename)
+	void SaveImageAs(string filename)
 	{
 		var ext = Path.GetExtension(filename);
 
@@ -162,7 +194,7 @@ public partial class MainForm : Form
 		_openedFileName = filename;
 	}
 
-	void SaveAs()
+	void SaveImageAs()
 	{
 		SaveFileDialog dialog = new()
 		{
@@ -172,21 +204,21 @@ public partial class MainForm : Form
 		if (dialog.ShowDialog() != DialogResult.OK)
 			return;
 
-		SaveAs(dialog.FileName);
+		SaveImageAs(dialog.FileName);
 	}
 
-	void Save()
+	void SaveImage()
 	{
 		if (_openedFileName == null)
 		{
-			SaveAs();
+			SaveImageAs();
 			return;
 		}
 
-		SaveAs(_openedFileName);
+		SaveImageAs(_openedFileName);
 	}
 
-	void Open()
+	void OpenImage()
 	{
 		OpenFileDialog dialog = new() { Filter = OpenDialogFilter };
 
@@ -200,7 +232,7 @@ public partial class MainForm : Form
 	void SetZoom(float newZoom, Point mouseWorkspace)
 	{
 		newZoom = Math.Clamp(newZoom, ZOOM_MIN, ZOOM_MAX);
-		if (Math.Abs(newZoom - _zoom) < 0.001f) return;
+		if (Math.Abs(newZoom - _zoom) < ZOOM_EPSILON) return;
 
 		PointF imageCoord = new PointF(
 			(mouseWorkspace.X - picture.Location.X) / _zoom,
@@ -226,6 +258,7 @@ public partial class MainForm : Form
 		);
 
 		picture.Invalidate();
+		StopCenterImageAnimation();
 	}
 
 	Point ScreenToBitmap(Point screenPoint)
@@ -236,10 +269,65 @@ public partial class MainForm : Form
 		);
 	}
 
-	// EVENTS //
-	private void openToolStripMenuItem_Click(object sender, EventArgs e) => Open();
+	async Task CenterImageAnimationLoop()
+	{
+		void PerformAnimationStep(Point target)
+		{
+			if (IsDisposed) return;
 
-	// Workspace //
+			var curr = picture.Location;
+
+			int deltaX = target.X - curr.X;
+			int deltaY = target.Y - curr.Y;
+			var distance = Math.Sqrt(deltaX * deltaX + deltaY * deltaY);
+
+			if (distance < ANIMATION_DISTANCE_EPSILON)
+			{
+				picture.Location = target;
+				lock (_animLock)
+					_animTarget = null;
+				return;
+			}
+
+			var step = distance * ANIMATION_SLOWDOWN_FACTOR;
+			var ratio = step / distance;
+
+			int newX = curr.X + (int)(deltaX * ratio);
+			int newY = curr.Y + (int)(deltaY * ratio);
+
+			picture.Location = new Point(newX, newY);
+		}
+
+		var token = _animCts.Token;
+		while (!token.IsCancellationRequested)
+		{
+			try { await Task.Delay(ANIMATION_INTERVAL_MS, token).ConfigureAwait(false); }
+			catch (OperationCanceledException) { break; }
+
+			if (token.IsCancellationRequested) break;
+
+
+			Point? target;
+			lock (_animLock) target = _animTarget;
+
+			if (!target.HasValue) continue;
+
+			try { Invoke(() => PerformAnimationStep(target.Value)); }
+			catch (ObjectDisposedException) { }
+			catch (InvalidOperationException) { }
+		}
+	}
+
+	void StopCenterImageAnimation()
+	{
+		lock (_animLock)
+			_animTarget = null;
+	}
+
+
+	// EVENTS //
+	private void openToolStripMenuItem_Click(object sender, EventArgs e) => OpenImage();
+
 	private void workspacePanel_MouseDown(object sender, MouseEventArgs e)
 	{
 		if (e.Button == MouseButtons.Left)
@@ -260,14 +348,13 @@ public partial class MainForm : Form
 		}
 		else if (e.Button == MouseButtons.Middle)
 		{
-			_isDragging = true;
+			IsDragging = true;
 			_dragStartPictureLocation = picture.Location;
 			_dragStartMousePos = e.Location;
 			// А мне пихую
 			workspacePanel.Cursor = Cursors.SizeAll;
 		}
 	}
-
 
 	private void workspacePanel_MouseMove(object sender, MouseEventArgs e)
 	{
@@ -276,17 +363,17 @@ public partial class MainForm : Form
 		bool isCursorOnPicture = bitmapLoc.X >= 0 && bitmapLoc.X < _bm.Width &&
 								 bitmapLoc.Y >= 0 && bitmapLoc.Y < _bm.Height;
 
-		if (_isDrawning && (isCursorOnPicture || _beInPictureOnLastFrame))
+		if (_isDrawning && (isCursorOnPicture || _cursorBeOnPictureInLastFrame))
 		{
 			Point prevBitmap = ScreenToBitmap(_previousMousePos);
 			Point currBitmap = ScreenToBitmap(e.Location);
 			_gfx.DrawLine(_pen, prevBitmap, currBitmap);
 			picture.Invalidate();
-			_beInPictureOnLastFrame = isCursorOnPicture;
+			_cursorBeOnPictureInLastFrame = isCursorOnPicture;
 		}
 		_previousMousePos = e.Location;
 
-		if (_isDragging)
+		if (IsDragging)
 		{
 			var delta = e.Location.Sub(_dragStartMousePos);
 
@@ -305,7 +392,7 @@ public partial class MainForm : Form
 			);
 		}
 
-		var requiredCursor = _isDragging ? Cursors.SizeAll : (isCursorOnPicture ? Cursors.Cross : Cursors.Default);
+		var requiredCursor = IsDragging ? Cursors.SizeAll : (isCursorOnPicture ? Cursors.Cross : Cursors.Default);
 		if (workspacePanel.Cursor != requiredCursor)
 			workspacePanel.Cursor = requiredCursor;
 	}
@@ -315,7 +402,7 @@ public partial class MainForm : Form
 		if (e.Button == MouseButtons.Left)
 			_isDrawning = false;
 		else if (e.Button == MouseButtons.Middle)
-			_isDragging = false;
+			IsDragging = false;
 	}
 
 	private void workspacePanel_MouseWheel(object? sender, MouseEventArgs e)
@@ -341,9 +428,9 @@ public partial class MainForm : Form
 		SelectedColor = dialog.Color;
 	}
 
-	private void saveToolStripMenuItem_Click(object sender, EventArgs e) => Save();
+	private void saveToolStripMenuItem_Click(object sender, EventArgs e) => SaveImage();
 
-	private void saveAsToolStripMenuItem_Click(object sender, EventArgs e) => SaveAs();
+	private void saveAsToolStripMenuItem_Click(object sender, EventArgs e) => SaveImageAs();
 
 	private void centerCameraToolStripMenuItem_Click(object sender, EventArgs e) => CenterImage();
 
@@ -371,10 +458,10 @@ public partial class MainForm : Form
 	{
 		if (e.Control && e.KeyCode == Keys.S)
 		{
-			Save();
+			SaveImage();
 			e.SuppressKeyPress = true;
 		}
 	}
 
-	private void MainForm_ResizeBegin(object sender, EventArgs e) => CenterImage();
+	private void MainForm_Resize(object sender, EventArgs e) => CenterImage();
 }

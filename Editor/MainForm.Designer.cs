@@ -259,8 +259,8 @@
 			Name = "MainForm";
 			RightToLeft = RightToLeft.No;
 			Text = "Image Editor";
-			ResizeBegin += MainForm_ResizeBegin;
 			KeyDown += MainForm_KeyDown;
+			Resize += MainForm_Resize;
 			toolsPanel.ResumeLayout(false);
 			colorGroupBox.ResumeLayout(false);
 			penWidthGroupBox.ResumeLayout(false);
