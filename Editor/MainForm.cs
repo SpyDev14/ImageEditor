@@ -235,12 +235,6 @@ public partial class MainForm : Form
 		_openedFileName = dialog.FileName;
 	}
 
-	/*void SetZoom(float newZoom)
-	{
-		Point mousePos = workspacePanel.Size.AreaCenter();
-		SetZoom(newZoom, mousePos);
-	}*/
-
 	void SetZoom(float newZoom, Point mouseWorkspace)
 	{
 		newZoom = Math.Clamp(newZoom, ZOOM_MIN, ZOOM_MAX);
