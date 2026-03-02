@@ -56,6 +56,12 @@ public partial class MainForm : Form
 		}
 	} = Color.Black;
 
+	const float ZOOM_MIN = 0.1f;
+	const float ZOOM_MAX = 10f;
+	const float ZOOM_FACTOR = 1.2f;
+
+	float _zoom = 1f;
+
 	static MainForm()
 	{
 		ExtensionToFileFormat = ImmutableDictionary.CreateRange(
@@ -243,13 +249,10 @@ public partial class MainForm : Form
 			var maxX = workspacePanel.ClientSize.Width - MIN_VISIBLE_PICTURE_PART;
 			var maxY = workspacePanel.ClientSize.Height - MIN_VISIBLE_PICTURE_PART;
 
-			if (newX < minX) newX = minX;
-			if (newY < minY) newY = minY;
-
-			if (newX > maxX) newX = maxX;
-			if (newY > maxY) newY = maxY;
-
-			picture.Location = new Point(newX, newY);
+			picture.Location = new Point(
+				Math.Clamp(newX, minX, maxX),
+				Math.Clamp(newY, minY, maxY)
+			);
 		}
 
 		var requiredCursor = _isDragging ? Cursors.SizeAll : (isCursorOnPicture ? Cursors.Cross : Cursors.Default);
