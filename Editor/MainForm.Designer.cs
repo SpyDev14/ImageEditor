@@ -43,6 +43,7 @@
 			ToolStripMenuItem turnToGrayEffectToolStripMenuItem;
 			ToolStripMenuItem viewToolStripMenuItem;
 			ToolStripMenuItem centerCameraToolStripMenuItem;
+			zoomLabel = new Label();
 			selectedColorPanel = new Panel();
 			penWidthTrackBar = new TrackBar();
 			workspacePanel = new Panel();
@@ -75,6 +76,7 @@
 			// 
 			toolsPanel.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Right;
 			toolsPanel.BackColor = SystemColors.ControlLightLight;
+			toolsPanel.Controls.Add(zoomLabel);
 			toolsPanel.Controls.Add(colorGroupBox);
 			toolsPanel.Controls.Add(penWidthGroupBox);
 			toolsPanel.Location = new Point(506, 24);
@@ -82,6 +84,19 @@
 			toolsPanel.Padding = new Padding(8, 6, 6, 6);
 			toolsPanel.Size = new Size(130, 317);
 			toolsPanel.TabIndex = 3;
+			// 
+			// zoomLabel
+			// 
+			zoomLabel.AutoSize = true;
+			zoomLabel.Dock = DockStyle.Bottom;
+			zoomLabel.ForeColor = SystemColors.GrayText;
+			zoomLabel.Location = new Point(8, 296);
+			zoomLabel.Margin = new Padding(0);
+			zoomLabel.Name = "zoomLabel";
+			zoomLabel.Size = new Size(70, 15);
+			zoomLabel.TabIndex = 5;
+			zoomLabel.Text = "Zoom 100%";
+			zoomLabel.TextAlign = ContentAlignment.BottomLeft;
 			// 
 			// colorGroupBox
 			// 
@@ -262,6 +277,7 @@
 			KeyDown += MainForm_KeyDown;
 			Resize += MainForm_Resize;
 			toolsPanel.ResumeLayout(false);
+			toolsPanel.PerformLayout();
 			colorGroupBox.ResumeLayout(false);
 			penWidthGroupBox.ResumeLayout(false);
 			penWidthGroupBox.PerformLayout();
@@ -280,5 +296,6 @@
 		private Panel workspacePanel;
 		private TrackBar penWidthTrackBar;
 		private Panel selectedColorPanel;
+		private Label zoomLabel;
 	}
 }

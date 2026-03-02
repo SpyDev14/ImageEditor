@@ -1,4 +1,5 @@
 using Editor.Extensions.ForPoint;
+using Editor.Extensions.ForSize;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Drawing.Drawing2D;
@@ -8,8 +9,10 @@ namespace Editor;
 
 public partial class MainForm : Form
 {
-	const int NEW_WORKSPACE_HORIZONTAL_PADDING = 24;
-	const int NEW_WORKSPACE_VERTICAL_PADDING = 16;
+	const int NEW_IMG_WORKSPACE_HORIZONTAL_PADDING = 24;
+	const int NEW_IMG_WORKSPACE_VERTICAL_PADDING = 16;
+	const int OPENED_IMG_WORKSPACE_PADDING = 16;
+
 	readonly int WorkspaceNegativeMargin;
 
 	const int MIN_VISIBLE_PICTURE_PART = 48;
@@ -36,7 +39,7 @@ public partial class MainForm : Form
 
 	Pen _pen;
 	Point _previousMousePos;
-	bool _isDrawning = false;
+	bool _isDrawing = false;
 	bool _cursorBeOnPictureInLastFrame = false;
 
 	Point _dragStartMousePos;
@@ -124,7 +127,6 @@ public partial class MainForm : Form
 
 		picture.SizeMode = PictureBoxSizeMode.StretchImage;
 
-
 		WorkspaceNegativeMargin = -Math.Min(workspacePanel.Location.X, 0);
 		_pen = new Pen(SelectedColor)
 		{
@@ -132,8 +134,8 @@ public partial class MainForm : Form
 			EndCap = LineCap.Round,
 			LineJoin = LineJoin.Round,
 		};
+		Shown += (s, e) => Task.Run(CenterImageAnimationLoop);
 
-		Task.Run(CenterImageAnimationLoop);
 
 		NewImage();
 
@@ -151,8 +153,10 @@ public partial class MainForm : Form
 		_gfx.SmoothingMode = SmoothingMode.AntiAlias;
 		picture.Image = _bm;
 
-		_zoom = 1.0f;
+		_zoom = 1f;
 		picture.Size = _bm.Size;
+
+		// Хотел бы тут ещё zoom подбирать такой, чтобы картинка влезала
 
 		CenterImage(smoothly: false);
 	}
@@ -160,8 +164,8 @@ public partial class MainForm : Form
 	void NewImage()
 	{
 		SetImage(new Bitmap(
-			workspacePanel.Width - NEW_WORKSPACE_HORIZONTAL_PADDING * 2,
-			workspacePanel.Height - NEW_WORKSPACE_VERTICAL_PADDING * 2
+			workspacePanel.Width - NEW_IMG_WORKSPACE_HORIZONTAL_PADDING * 2,
+			workspacePanel.Height - NEW_IMG_WORKSPACE_VERTICAL_PADDING * 2
 		));
 		_gfx.Clear(Color.White);
 		_openedFileName = null;
@@ -225,9 +229,17 @@ public partial class MainForm : Form
 		if (dialog.ShowDialog() != DialogResult.OK)
 			return;
 
-		SetImage(Image.FromFile(dialog.FileName));
+		using (var img = Image.FromFile(dialog.FileName))
+			SetImage(img);
+
 		_openedFileName = dialog.FileName;
 	}
+
+	/*void SetZoom(float newZoom)
+	{
+		Point mousePos = workspacePanel.Size.AreaCenter();
+		SetZoom(newZoom, mousePos);
+	}*/
 
 	void SetZoom(float newZoom, Point mouseWorkspace)
 	{
@@ -240,6 +252,7 @@ public partial class MainForm : Form
 		);
 
 		_zoom = newZoom;
+		zoomLabel.Text = $"Zoom {_zoom * 100:0.#}%";
 
 		Size newSize = new Size((int)(_bm.Width * _zoom), (int)(_bm.Height * _zoom));
 		picture.Size = newSize;
@@ -285,7 +298,8 @@ public partial class MainForm : Form
 			{
 				picture.Location = target;
 				lock (_animLock)
-					_animTarget = null;
+					// _animTarget мог быть изменён (цель изменилась)
+					if (_animTarget == target) _animTarget = null;
 				return;
 			}
 
@@ -313,7 +327,7 @@ public partial class MainForm : Form
 			if (!target.HasValue) continue;
 
 			try { Invoke(() => PerformAnimationStep(target.Value)); }
-			catch (ObjectDisposedException) { }
+			catch (ObjectDisposedException) { } // Форма была закрыта
 			catch (InvalidOperationException) { }
 		}
 	}
@@ -332,7 +346,7 @@ public partial class MainForm : Form
 	{
 		if (e.Button == MouseButtons.Left)
 		{
-			_isDrawning = true;
+			_isDrawing = true;
 			Point bitmapLoc = ScreenToBitmap(e.Location);
 			using (var brush = new SolidBrush(SelectedColor))
 			{
@@ -351,8 +365,9 @@ public partial class MainForm : Form
 			IsDragging = true;
 			_dragStartPictureLocation = picture.Location;
 			_dragStartMousePos = e.Location;
-			// А мне пихую
-			workspacePanel.Cursor = Cursors.SizeAll;
+
+			if (workspacePanel.Cursor != Cursors.SizeAll)
+				workspacePanel.Cursor = Cursors.SizeAll;
 		}
 	}
 
@@ -363,7 +378,7 @@ public partial class MainForm : Form
 		bool isCursorOnPicture = bitmapLoc.X >= 0 && bitmapLoc.X < _bm.Width &&
 								 bitmapLoc.Y >= 0 && bitmapLoc.Y < _bm.Height;
 
-		if (_isDrawning && (isCursorOnPicture || _cursorBeOnPictureInLastFrame))
+		if (_isDrawing && (isCursorOnPicture || _cursorBeOnPictureInLastFrame))
 		{
 			Point prevBitmap = ScreenToBitmap(_previousMousePos);
 			Point currBitmap = ScreenToBitmap(e.Location);
@@ -400,7 +415,7 @@ public partial class MainForm : Form
 	private void workspacePanel_MouseUp(object sender, MouseEventArgs e)
 	{
 		if (e.Button == MouseButtons.Left)
-			_isDrawning = false;
+			_isDrawing = false;
 		else if (e.Button == MouseButtons.Middle)
 			IsDragging = false;
 	}
@@ -443,14 +458,22 @@ public partial class MainForm : Form
 	private void turnToGrayEffectToolStripMenuItem_Click(object sender, EventArgs e)
 	{
 		Cursor = Cursors.WaitCursor;
-		for (int x = 0; x < _bm.Width; x++)
-			for (int y = 0; y < _bm.Height; y++)
+		const float percentsPerPixel = 0.01f;
+		long pixelsForRefresh = Math.Max((long)(_bm.Height * _bm.Width * percentsPerPixel), 1);
+		int width = _bm.Width;
+
+		for (int y = 0; y < _bm.Height; y++)
+			for (int x = 0; x < _bm.Width; x++)
 			{
 				var pixel = _bm.GetPixel(x, y);
 				var grey = (pixel.R + pixel.B + pixel.G) / 3;
 				_bm.SetPixel(x, y, Color.FromArgb(255, grey, grey, grey));
+
+				// Для эффекта построчности (по приколу)
+				if ((y * width + x) % pixelsForRefresh == 0)
+					picture.Refresh();
 			}
-		picture.Invalidate();
+
 		Cursor = Cursors.Default;
 	}
 
@@ -464,4 +487,5 @@ public partial class MainForm : Form
 	}
 
 	private void MainForm_Resize(object sender, EventArgs e) => CenterImage();
+	
 }
