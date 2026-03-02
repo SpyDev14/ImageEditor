@@ -91,9 +91,11 @@ public partial class MainForm : Form
 			_gfx?.Dispose();
 			_pen?.Dispose();
 		};
+		workspacePanel.MouseWheel += workspacePanel_MouseWheel;
+
+		WorkspaceNegativeMargin = -Math.Min(workspacePanel.Location.X, 0);
 
 
-		selectedColorPanel.BackColor = SelectedColor;
 		_pen = new Pen(SelectedColor)
 		{
 			StartCap = LineCap.Round,
@@ -101,10 +103,13 @@ public partial class MainForm : Form
 			LineJoin = LineJoin.Round,
 		};
 
+		selectedColorPanel.BackColor = SelectedColor;
+
 		penWidthTrackBar.Minimum = MIN_PEN_WIDTH;
 		penWidthTrackBar.Maximum = MAX_PEN_WIDTH;
 
-		WorkspaceNegativeMargin = -Math.Min(workspacePanel.Location.X, 0);
+		picture.SizeMode = PictureBoxSizeMode.StretchImage;
+
 
 		NewImage();
 
@@ -122,6 +127,7 @@ public partial class MainForm : Form
 		_gfx.SmoothingMode = SmoothingMode.AntiAlias;
 		picture.Image = _bm;
 
+		_zoom = 1.0f;
 		picture.Size = _bm.Size;
 
 		CenterImage();
@@ -161,7 +167,7 @@ public partial class MainForm : Form
 		SaveFileDialog dialog = new()
 		{
 			Filter = SaveDialogFilter,
-			FileName = $"New image ({DateTime.Now})"
+			FileName = $"New image"
 		};
 		if (dialog.ShowDialog() != DialogResult.OK)
 			return;
@@ -180,9 +186,7 @@ public partial class MainForm : Form
 		SaveAs(_openedFileName);
 	}
 
-
-	// EVENTS //
-	private void openToolStripMenuItem_Click(object sender, EventArgs e)
+	void Open()
 	{
 		OpenFileDialog dialog = new() { Filter = OpenDialogFilter };
 
@@ -190,7 +194,50 @@ public partial class MainForm : Form
 			return;
 
 		SetImage(Image.FromFile(dialog.FileName));
+		_openedFileName = dialog.FileName;
 	}
+
+	void SetZoom(float newZoom, Point mouseWorkspace)
+	{
+		newZoom = Math.Clamp(newZoom, ZOOM_MIN, ZOOM_MAX);
+		if (Math.Abs(newZoom - _zoom) < 0.001f) return;
+
+		PointF imageCoord = new PointF(
+			(mouseWorkspace.X - picture.Location.X) / _zoom,
+			(mouseWorkspace.Y - picture.Location.Y) / _zoom
+		);
+
+		_zoom = newZoom;
+
+		Size newSize = new Size((int)(_bm.Width * _zoom), (int)(_bm.Height * _zoom));
+		picture.Size = newSize;
+
+		int newX = (int)(mouseWorkspace.X - imageCoord.X * _zoom);
+		int newY = (int)(mouseWorkspace.Y - imageCoord.Y * _zoom);
+
+		var minX = -newSize.Width + MIN_VISIBLE_PICTURE_PART;
+		var minY = -newSize.Height + MIN_VISIBLE_PICTURE_PART;
+		var maxX = workspacePanel.ClientSize.Width - MIN_VISIBLE_PICTURE_PART;
+		var maxY = workspacePanel.ClientSize.Height - MIN_VISIBLE_PICTURE_PART;
+
+		picture.Location = new Point(
+			Math.Clamp(newX, minX, maxX),
+			Math.Clamp(newY, minY, maxY)
+		);
+
+		picture.Invalidate();
+	}
+
+	Point ScreenToBitmap(Point screenPoint)
+	{
+		return new Point(
+			(int)((screenPoint.X - picture.Location.X) / _zoom),
+			(int)((screenPoint.Y - picture.Location.Y) / _zoom)
+		);
+	}
+
+	// EVENTS //
+	private void openToolStripMenuItem_Click(object sender, EventArgs e) => Open();
 
 	// Workspace //
 	private void workspacePanel_MouseDown(object sender, MouseEventArgs e)
@@ -198,13 +245,13 @@ public partial class MainForm : Form
 		if (e.Button == MouseButtons.Left)
 		{
 			_isDrawning = true;
-			var loc = e.Location.Sub(picture.Location);
+			Point bitmapLoc = ScreenToBitmap(e.Location);
 			using (var brush = new SolidBrush(SelectedColor))
 			{
 				float diameter = _pen.Width;
 				float radius = diameter / 2;
-				float x = loc.X - radius - 0.5f;
-				float y = loc.Y - radius - 0.5f;
+				float x = bitmapLoc.X - radius;
+				float y = bitmapLoc.Y - radius;
 
 				_gfx.FillEllipse(brush, x, y, diameter, diameter);
 			}
@@ -225,12 +272,15 @@ public partial class MainForm : Form
 	private void workspacePanel_MouseMove(object sender, MouseEventArgs e)
 	{
 		var loc = e.Location.Sub(picture.Location);
-		bool isCursorOnPicture = loc.Y >= 0 && loc.Y < picture.Height &&
-								 loc.X >= 0 && loc.X < picture.Width;
+		Point bitmapLoc = ScreenToBitmap(e.Location);
+		bool isCursorOnPicture = bitmapLoc.X >= 0 && bitmapLoc.X < _bm.Width &&
+								 bitmapLoc.Y >= 0 && bitmapLoc.Y < _bm.Height;
 
 		if (_isDrawning && (isCursorOnPicture || _beInPictureOnLastFrame))
 		{
-			_gfx.DrawLine(_pen, _previousMousePos.Sub(picture.Location), loc);
+			Point prevBitmap = ScreenToBitmap(_previousMousePos);
+			Point currBitmap = ScreenToBitmap(e.Location);
+			_gfx.DrawLine(_pen, prevBitmap, currBitmap);
 			picture.Invalidate();
 			_beInPictureOnLastFrame = isCursorOnPicture;
 		}
@@ -243,8 +293,8 @@ public partial class MainForm : Form
 			var newX = _dragStartPictureLocation.X + delta.X;
 			var newY = _dragStartPictureLocation.Y + delta.Y;
 
-			var minX = (-picture.Width) + MIN_VISIBLE_PICTURE_PART;
-			var minY = (-picture.Height) + MIN_VISIBLE_PICTURE_PART;
+			var minX = -picture.Width + MIN_VISIBLE_PICTURE_PART;
+			var minY = -picture.Height + MIN_VISIBLE_PICTURE_PART;
 
 			var maxX = workspacePanel.ClientSize.Width - MIN_VISIBLE_PICTURE_PART;
 			var maxY = workspacePanel.ClientSize.Height - MIN_VISIBLE_PICTURE_PART;
@@ -268,6 +318,13 @@ public partial class MainForm : Form
 			_isDragging = false;
 	}
 
+	private void workspacePanel_MouseWheel(object? sender, MouseEventArgs e)
+	{
+		float delta = e.Delta > 0 ? ZOOM_FACTOR : 1f / ZOOM_FACTOR;
+		float newZoom = _zoom * delta;
+		SetZoom(newZoom, e.Location);
+	}
+
 	private void penWidthTrackBar_ValueChanged(object sender, EventArgs e)
 	{
 		_pen.Width = penWidthTrackBar.Value;
@@ -288,8 +345,7 @@ public partial class MainForm : Form
 
 	private void saveAsToolStripMenuItem_Click(object sender, EventArgs e) => SaveAs();
 
-	private void centerCameraToolStripMenuItem_Click(object sender, EventArgs e)
-		=> CenterImage();
+	private void centerCameraToolStripMenuItem_Click(object sender, EventArgs e) => CenterImage();
 
 	private void withParamsToolStripMenuItem_Click(object sender, EventArgs e)
 	{
