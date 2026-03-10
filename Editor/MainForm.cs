@@ -11,7 +11,7 @@ public partial class MainForm : Form
 {
 	const int NEW_IMG_WORKSPACE_HORIZONTAL_PADDING = 24;
 	const int NEW_IMG_WORKSPACE_VERTICAL_PADDING = 16;
-	const int OPENED_IMG_WORKSPACE_PADDING = 16;
+	//const int OPENED_IMG_WORKSPACE_PADDING = 16;
 
 	readonly int WorkspaceNegativeMargin;
 
@@ -158,6 +158,7 @@ public partial class MainForm : Form
 
 		// Хотел бы тут ещё zoom подбирать такой, чтобы картинка влезала
 		// Ещё бы зум переработать, чтобы 100% - это picture размера workspacePanel с учётом OPEN_IMG...PADDING
+		ResetZoom();
 
 		CenterImage(smoothly: false);
 	}
@@ -234,6 +235,14 @@ public partial class MainForm : Form
 			SetImage(img);
 
 		_openedFileName = dialog.FileName;
+	}
+
+	void ResetZoom()
+	{
+		CenterImage(false);
+		var x = workspacePanel.Width / 2;
+		var y = workspacePanel.Height / 2;
+		SetZoom(1, new Point(x, y));
 	}
 
 	void SetZoom(float newZoom, Point mouseWorkspace)
@@ -482,5 +491,6 @@ public partial class MainForm : Form
 	}
 
 	private void MainForm_Resize(object sender, EventArgs e) => CenterImage();
-	
+
+	private void resetZoomToolStripMenuItem_Click(object sender, EventArgs e) => ResetZoom();
 }
